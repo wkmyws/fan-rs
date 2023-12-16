@@ -1,0 +1,49 @@
+name: Rust Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  BUILD_TARGET: aarch64-unknown-linux-musl # aarch64-unknown-linux-gnu
+  BINARY_NAME: null # will be set by the build job
+  VERSION: null # will be set by the build job
+  GIT_COMMIT: null # will be set by the build job
+  GIT_BRANCH: null # will be set by the build job
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      # get version
+      - name: Get Version
+        id: version
+        run: echo "VERSION=$(cat Cargo.toml | grep -oP '(?<=^version = ")[^"]+')" >> "$GITHUB_ENV"
+      # get name
+      - name: Get Name
+        id: name
+        run: echo "BINARY_NAME=$(cat Cargo.toml | grep -oP '(?<=^name = ")[^"]+')" >> "$GITHUB_ENV"
+      # get git commit info
+      - name: Get Git Commit Info
+        id: git
+        run: |
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> "$GITHUB_ENV"
+          git log --format=%B -n 1 ${{ env.GIT_COMMIT }} >> changelog
+      # 交叉编译
+      - name: Build
+        run: cargo install cross && cross build --target $BUILD_TARGET --release
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        # if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body_path: changelog
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.VERSION }}
+          files: |
+            target/${{ env.BUILD_TARGET }}/release/${{ env.BINARY_NAME }}
