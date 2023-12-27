@@ -18,6 +18,7 @@ use std::{thread, time};
 
 static mut AUTO_MODE: bool = false;
 static mut SCREEN_Y: u16 = 0;
+static mut CPU_USAGE_INTERVAL_MILLIS: u64 = 100;
 
 fn clear() {
     execute!(stdout(), terminal::Clear(terminal::ClearType::All)).unwrap();
@@ -51,7 +52,10 @@ fn render(force: bool) -> u16 {
     let fan_level = fan::fan(10).unwrap();
     let help_body = http_server_help();
     let tmp = format!("{:>5.2}°C", temp::get_temp().unwrap_or(0.0));
-    let usage = format!("{:>6.2}%", temp::get_cpu_usage(100));
+    let usage = format!(
+        "{:>6.2}%",
+        temp::get_cpu_usage(unsafe { CPU_USAGE_INTERVAL_MILLIS })
+    );
 
     if part == false {
         // 不是展示部分信息
@@ -63,7 +67,8 @@ fn render(force: bool) -> u16 {
             ii += 1;
         }
     }
-    let __version = format!("| {:<20} {:>18} |",
+    let __version = format!(
+        "| {:<20} {:>18} |",
         "Author: ".to_string() + env!("CARGO_PKG_AUTHORS"),
         "Version: ".to_string() + env!("CARGO_PKG_VERSION")
     );
@@ -101,7 +106,7 @@ fn render(force: bool) -> u16 {
     return ii;
 }
 
-fn print_events(shraed_automode:&Arc<Mutex<bool>>) -> io::Result<()> {
+fn print_events(shraed_automode: &Arc<Mutex<bool>>) -> io::Result<()> {
     loop {
         let event = read()?;
         if let Event::Key(KeyEvent {
@@ -143,10 +148,17 @@ fn print_events(shraed_automode:&Arc<Mutex<bool>>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn main(shraed_automode: Arc<Mutex<bool>>) {
+pub fn main(shraed_automode: Arc<Mutex<bool>>, flash_interval_millis: u64) {
     unsafe {
         AUTO_MODE = cli::is_auto();
     }
+    let flash_interval_millis = unsafe {
+        if CPU_USAGE_INTERVAL_MILLIS >= flash_interval_millis {
+            1
+        } else {
+            flash_interval_millis - CPU_USAGE_INTERVAL_MILLIS
+        }
+    };
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     queue!(
@@ -161,7 +173,7 @@ pub fn main(shraed_automode: Arc<Mutex<bool>>) {
         clear();
         render(true);
         loop {
-            thread::sleep(time::Duration::from_millis(1000));
+            thread::sleep(time::Duration::from_millis(flash_interval_millis));
             let auto_mode = *(shared_automode2.lock().unwrap());
             unsafe {
                 AUTO_MODE = auto_mode;

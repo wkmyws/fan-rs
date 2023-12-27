@@ -5,53 +5,38 @@ use std::thread;
 use std::time::Duration;
 
 pub fn get_cpu_usage(millis: u64) -> f32 {
-    let times = 5; // 统计5次的均值
-    let interval = Duration::from_millis(millis / times);
-    let mut arr_usage: Vec<f32> = vec![];
 
-    let mut total_time_prev: u64 = 0;
-    let mut idle_time_prev: u64 = 0;
-
-    for _ in 0..times {
+    fn read_cpu_stat() -> Vec<u64> {
         let file = File::open("/proc/stat").expect("Failed to open /proc/stat");
         let reader = BufReader::new(file);
-
-        let mut total_time: u64 = 0;
-        let mut idle_time: u64 = 0;
-
         for line in reader.lines() {
             let line = line.expect("Failed to read line from /proc/stat");
             let fields: Vec<&str> = line.split_whitespace().collect();
-
-            if fields.len() > 0 && fields[0] == "cpu" {
-                for (i, &field) in fields.iter().enumerate() {
-                    if i > 0 {
-                        let time: u64 = field.parse().expect("Failed to parse CPU time");
-                        total_time += time;
-                        if i == 4 {
-                            idle_time = time;
-                        }
-                    }
-                }
-                break;
+            if fields.len() > 0 && fields[0] == "cpu" { // 找到cpu所在的行
+                // cpu user nice system idle iowait irq softirq steal guest guest_nice
+                // ->
+                // user nice system idle iowait irq softirq steal guest guest_nice
+                return fields.iter().skip(1).map(|s| s.parse::<u64>().unwrap()).collect::<Vec<u64>>();
             }
         }
-
-        let total_delta = total_time - total_time_prev;
-        let idle_delta = idle_time - idle_time_prev;
-
-        let usage = 1.0 - (idle_delta as f32) / (total_delta as f32);
-
-        // println!("CPU Usage: {:.2}%", usage * 100.0);
-        arr_usage.push(usage);
-
-        total_time_prev = total_time;
-        idle_time_prev = idle_time;
-
-        thread::sleep(interval);
+        panic!("Failed to read cpu stat");
     }
-    let ans = arr_usage.iter().sum::<f32>() / arr_usage.len() as f32 * 100 as f32;
-    return ans;
+
+    fn calc_cpu(nums: Vec<u64>) -> (u64, u64) {
+        // nums: user nice system idle iowait irq softirq steal guest guest_nice
+        // ref : https://stackoverflow.com/questions/23367857/accurate-calculation-of-cpu-usage-given-in-percentage-in-linux
+        let total = nums.iter().sum::<u64>();
+        let idle = nums[3] + nums[4]; // idle + iowait
+        // let non_idle = total - idle;
+        return (total, idle);
+    }
+
+    let (pre_total, pre_idle) = calc_cpu(read_cpu_stat());
+    thread::sleep(Duration::from_millis(millis));
+    let (cur_total, cur_idle) = calc_cpu(read_cpu_stat());
+    let diff_total = cur_total - pre_total;
+    let diff_idle = cur_idle - pre_idle;
+    return 100.0 * (diff_total - diff_idle) as f32 / diff_total as f32;
 }
 
 pub fn get_temp() -> Option<f32> {

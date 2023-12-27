@@ -18,6 +18,9 @@ pub struct Cli {
     #[arg(long,default_value_t=String::from("127.0.0.1:8567"))]
     addr: String,
 
+    #[arg(long, default_value_t = 1000)]
+    interval: u64, // 终端信息刷新间隔ms
+
     /// Automatically adjust the fan speed
     #[arg(short = 'a', long)]
     auto: Option<bool>, // 根据温度自动调整风速
@@ -49,4 +52,8 @@ pub fn get_temp() -> bool {
 
 pub fn get_server_addr() -> String {
     return Cli::parse().addr;
+}
+
+pub fn get_log_interval_millis() -> u64 {
+    return Cli::parse().interval;
 }

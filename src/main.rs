@@ -24,7 +24,8 @@ fn main() {
             Err(err) => println!("err:{}", err),
         }
     } else { // server
-        server::server::main();
+        let log_interval = cli::get_log_interval_millis();
+        server::server::main(log_interval);
     }
     exit(0);
 }

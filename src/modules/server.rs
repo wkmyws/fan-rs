@@ -145,7 +145,7 @@ pub mod server {
     use super::{auto_fan, http_server};
     use std::{thread, sync::{Arc, Mutex}};
 
-    pub fn main() {
+    pub fn main(flash_interval_millis: u64) {
         let addr = cli::get_server_addr();
         let auto_mode = cli::is_auto();
 
@@ -177,7 +177,7 @@ pub mod server {
         let thread_render = thread::spawn(move || {
             // 绘制控制台
             let shraed_automode = Arc::clone(&shraed_automode3);
-            console::main(shraed_automode);
+            console::main(shraed_automode, flash_interval_millis);
         });
         thread_render.join().unwrap();
     }
