@@ -18,6 +18,7 @@ pub struct Cli {
     #[arg(long,default_value_t=String::from("127.0.0.1:8567"))]
     addr: String,
 
+    /// set the refresh interval for terminal information
     #[arg(long, default_value_t = 1000)]
     interval: u64, // 终端信息刷新间隔ms
 

@@ -24,6 +24,8 @@
 ```bash
 # Enable HTTP service and bind the port to 0.0.0.0:8567
 ./fan-rs -l --addr="0.0.0.0:8567"
+# Set the refresh interval for terminal information (unit: milliseconds).
+./fan-rs -l --addr="0.0.0.0:8567" --interval=2000
 ```
 
 > This mode allows controlling the fan speed through both terminal keystrokes and HTTP requests.
