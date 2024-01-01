@@ -1,6 +1,7 @@
 pub mod http_server {
     use crate::modules::cli;
     use crate::modules::fan;
+    use crate::modules::log;
     use crate::modules::temp;
     use regex::Regex;
     use std::io::Read;
@@ -78,14 +79,14 @@ pub mod http_server {
                 other => err = format!("unexpected key : {other}"),
             }
             if err != "" {
-                println!("{:?}", err);
+                log::err(&format!("parse query string error : {}", err));
                 return None;
             }
         }
         Some((key.to_string(), value.to_string()))
     }
 
-    pub fn main(addr: String, shraed_automode: Arc<Mutex<bool>>) {
+    pub fn main(addr: &String, shraed_automode: Arc<Mutex<bool>>) {
         let listener = TcpListener::bind(addr).unwrap();
         for stream in listener.incoming() {
             let stream = stream.unwrap();
@@ -121,7 +122,7 @@ pub mod http_server {
 }
 
 mod auto_fan {
-    use crate::modules::{fan, temp};
+    use crate::modules::{fan, log, temp};
     use std::sync::{Arc, Mutex};
     use std::{thread, time::Duration};
     pub fn main(shraed_automode: Arc<Mutex<bool>>) {
@@ -131,7 +132,12 @@ mod auto_fan {
                 let cur_level = fan::fan(10).unwrap();
                 let next_level = temp::get_fan_level();
                 if next_level != cur_level {
-                    fan::fan(next_level).unwrap();
+                    // fan::fan(next_level).unwrap();
+                    while let Err(err) = fan::fan(next_level) {
+                        log::err(&format!("auto fan error : {}", err));
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                    log::info(&format!("auto fan : {} -> {}", cur_level, next_level));
                 }
             }
             //
@@ -141,9 +147,12 @@ mod auto_fan {
 }
 
 pub mod server {
-    use crate::modules::{cli, console, fan};
     use super::{auto_fan, http_server};
-    use std::{thread, sync::{Arc, Mutex}};
+    use crate::modules::{cli, console, fan, log};
+    use std::{
+        sync::{Arc, Mutex},
+        thread,
+    };
 
     pub fn main(flash_interval_millis: u64) {
         let addr = cli::get_server_addr();
@@ -158,7 +167,7 @@ pub mod server {
             // 监听http请求
             let shraed_automode = Arc::clone(&shraed_automode1);
             if let Err(_) = std::panic::catch_unwind(|| {
-                http_server::main(addr.clone(), shraed_automode);
+                http_server::main(&addr, shraed_automode);
             }) {
                 std::process::exit(-1);
             }
@@ -179,6 +188,8 @@ pub mod server {
             let shraed_automode = Arc::clone(&shraed_automode3);
             console::main(shraed_automode, flash_interval_millis);
         });
+        log::info(&format!("fan-rs start at {} ~\n", cli::get_server_addr()));
         thread_render.join().unwrap();
+        log::info(&format!("fan-rs exit ~\n"));
     }
 }

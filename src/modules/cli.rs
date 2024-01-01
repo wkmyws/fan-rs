@@ -25,6 +25,10 @@ pub struct Cli {
     /// Automatically adjust the fan speed
     #[arg(short = 'a', long)]
     auto: Option<bool>, // 根据温度自动调整风速
+
+    /// log file path
+    #[arg(long, default_value_t = String::from("~/.fan-rs.log"))]
+    log: String, // 日志文件路径
 }
 
 pub fn is_cli() -> bool {
@@ -57,4 +61,13 @@ pub fn get_server_addr() -> String {
 
 pub fn get_log_interval_millis() -> u64 {
     return Cli::parse().interval;
+}
+
+pub fn get_log_path() -> String {
+    let log_path = Cli::parse().log;
+    // use std::path;
+    // let log_path = path::Path::new(&log_path);
+    // return String::from(log_path.to_str().unwrap());
+    let log_path = expanduser::expanduser(&log_path).unwrap();
+    return String::from(log_path.to_str().unwrap());
 }

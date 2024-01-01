@@ -16,6 +16,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::{thread, time};
 
+use super::log;
+
 static mut AUTO_MODE: bool = false;
 static mut SCREEN_Y: u16 = 0;
 static mut CPU_USAGE_INTERVAL_MILLIS: u64 = 100;
@@ -83,6 +85,7 @@ fn render(force: bool) -> u16 {
             auto_mode, fan_level
         ),
         format!("|cpu  temp : {}   cpu usage : {}|", tmp, usage),
+        format!("|log  path : {:29}|", cli::get_log_path().chars().take(29).collect::<String>()),
         "└-----------------------------------------┘".to_string(),
     ] {
         println!("{}", line);
@@ -136,15 +139,18 @@ fn print_events(shraed_automode: &Arc<Mutex<bool>>) -> io::Result<()> {
             if event == Event::Key(KeyCode::Char(std::char::from_digit(key, 10).unwrap()).into()) {
                 *(shraed_automode.lock().unwrap()) = false;
                 println!("set speed at {}", key);
+                log::info(&format!("[keyboard] set speed at {}", key));
                 fan::fan(key as u8).unwrap();
                 break;
             } else if event == Event::Key(KeyCode::Char('a').into()) {
                 println!("auto mode on");
+                log::info(&format!("[keyboard] auto mode on"));
                 *(shraed_automode.lock().unwrap()) = true;
                 break;
             }
         }
     }
+    disable_raw_mode().unwrap();
     Ok(())
 }
 
@@ -182,7 +188,7 @@ pub fn main(shraed_automode: Arc<Mutex<bool>>, flash_interval_millis: u64) {
         }
     });
     if let Err(e) = print_events(&shraed_automode) {
-        println!("Error: {:?}\r", e);
+        log::err(&format!("print_events error : {:?}", e));
     }
     queue!(
         stdout,

@@ -3,3 +3,4 @@ pub mod cli;
 pub mod fan;
 pub mod temp;
 pub mod console;
+pub mod log;
